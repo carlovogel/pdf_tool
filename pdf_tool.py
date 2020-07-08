@@ -56,6 +56,8 @@ class PdfTool(QtWidgets.QDialog):
 
     @staticmethod
     def get_page_count(file):
+        """Returns the number of pages of the given pdf file.
+        """
         output = subprocess.check_output(['pdfinfo', file]).decode()
         pages_line = [line for line in output.splitlines() if 'Pages:' in line][0]
         page_count = int(pages_line.split(':')[1])
@@ -77,7 +79,7 @@ class TabCompress(QtWidgets.QWidget):
         self.file_list = []
         self.output_path = Path().home()
         self.file_list_widget = QtWidgets.QListWidget()
-        self.file_list_widget.setMinimumWidth(500)
+        self.file_list_widget.setMinimumWidth(450)
         self.label_output_files = QtWidgets.QLabel(str(self.output_path))
         self.line_edit_suffix = QtWidgets.QLineEdit('_2')
         self.line_edit_suffix.setMaximumWidth(40)
@@ -186,7 +188,9 @@ class TabCompress(QtWidgets.QWidget):
                     if file.parent == output_path and not self.line_edit_suffix.text():
                         message_box = QtWidgets.QMessageBox(self)
                         message_box.setText(
-                            'Suffix field is empty! Output path should be different to the path of your input files to avoid losing files!')
+                            'Suffix field is empty! Output path should be different to '
+                            'the path of your input files to avoid losing files!'
+                                            )
                         message_box.show()
                         return False
 
@@ -207,7 +211,9 @@ class TabCompress(QtWidgets.QWidget):
         """
         self.file_dialog_input.setFileMode(QtWidgets.QFileDialog.ExistingFiles)
         self.file_dialog_input.setAcceptMode(QtWidgets.QFileDialog.AcceptSave)
-        file_list_temp = self.file_dialog_input.getOpenFileNames(self, 'Select pdf files to compress!', '', 'Pdf files (*.pdf)')[0]
+        file_list_temp = self.file_dialog_input.getOpenFileNames(
+            self, 'Select pdf files to compress!', '', 'Pdf files (*.pdf)'
+                                                                 )[0]
         if file_list_temp:
             for file in file_list_temp:
                 self.file_list.append(Path(file))
@@ -295,9 +301,6 @@ class TabSplit(QtWidgets.QWidget):
         push_button_load_files_input.setToolTip('Load pdf file')
         push_button_load_files_input.clicked.connect(self.open_file_dialog_input)
 
-
-
-
         push_button_start_splitting = QtWidgets.QPushButton('Start splitting')
         push_button_start_splitting.setIcon(QIcon.fromTheme('split'))
         push_button_start_splitting.clicked.connect(self.start_splitting)
@@ -341,10 +344,14 @@ class TabSplit(QtWidgets.QWidget):
         """
         self.file_dialog_input.setFileMode(QtWidgets.QFileDialog.ExistingFile)
         self.file_dialog_input.setAcceptMode(QtWidgets.QFileDialog.AcceptSave)
-        self.file = self.file_dialog_input.getOpenFileName(self, 'Select pdf file to split!', '', 'Pdf files (*.pdf)')[0]
+        self.file = self.file_dialog_input.getOpenFileName(
+            self, 'Select pdf file to split!', '', 'Pdf files (*.pdf)'
+                                                           )[0]
         if self.file:
             self.label_file.setText(f'Selected pdf file:   {self.file}')
-        self.label_split_pattern.setText(f'Pages to Extract: (Input file has {PdfTool.get_page_count(self.file)} pages)')
+        self.label_split_pattern.setText(
+            f'Pages to Extract: (Input file has {PdfTool.get_page_count(self.file)} pages)'
+                                         )
 
     def open_folder_dialog_output(self):
         """Opens the folder dialog to choose the destination of the output files. Writes its value to self.output_path.
@@ -419,8 +426,9 @@ class TabSplit(QtWidgets.QWidget):
         return list_new
 
     def split_pdf(self, start, stop, input_file, output_file):
-        """Start single splitting process with tool pdfseperate. Takes start page, stop page, input file and output file in
-        string format as arguments. Returns True if successful, False otherwise.
+        """Start single splitting process with tool pdfseperate.
+        Takes start page, stop page, input file and output file in string format as arguments.
+        Returns True if successful, False otherwise.
         """
         command = ['pdfseparate', '-f', start, '-l', stop, input_file, f'{output_file}%d']
         with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT) as proc:
@@ -432,7 +440,9 @@ class TabSplit(QtWidgets.QWidget):
             if b'Illegal pageNo' in log_split:
                 page_string = log_split.strip()[-4:].decode()
                 message_box = QtWidgets.QMessageBox(self)
-                message_box.setText(f'Page {page_string[0]} doesn\'t exist. The pdf file only contains {page_string[2]} pages.')
+                message_box.setText(
+                    f'Page {page_string[0]} doesn\'t exist. The pdf file only contains {page_string[2]} pages.'
+                                    )
                 message_box.show()
                 return False
         return True
@@ -567,7 +577,9 @@ class TabMerge(QtWidgets.QWidget):
         """
         self.file_dialog_input.setFileMode(QtWidgets.QFileDialog.ExistingFiles)
         self.file_dialog_input.setAcceptMode(QtWidgets.QFileDialog.AcceptSave)
-        file_list_temp = self.file_dialog_input.getOpenFileNames(self, 'Select pdf files to compress!', '', 'Pdf files (*.pdf)')[0]
+        file_list_temp = self.file_dialog_input.getOpenFileNames(
+            self, 'Select pdf files to compress!', '', 'Pdf files (*.pdf)'
+                                                                 )[0]
         if file_list_temp:
             for file in file_list_temp:
                 self.file_list.append(Path(file))
@@ -625,6 +637,7 @@ class TabMerge(QtWidgets.QWidget):
         else:
             message_box.setText('Choose a file name!')
             message_box.show()
+
 
 def main():
     app = QtWidgets.QApplication(sys.argv)
