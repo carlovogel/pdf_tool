@@ -54,13 +54,19 @@ class PdfTool(QtWidgets.QDialog):
         except IndexError:
             pass
 
+    @staticmethod
+    def get_page_count(file):
+        output = subprocess.check_output(['pdfinfo', file]).decode()
+        pages_line = [line for line in output.splitlines() if 'Pages:' in line][0]
+        page_count = int(pages_line.split(':')[1])
+        return page_count
+
 
 class TabCompress(QtWidgets.QWidget):
     """Tab containing the elements for pdf compression.
     """
     def __init__(self):
         super().__init__()
-
         self.horizontal_layout = QtWidgets.QHBoxLayout(self)
         self.horizontal_layout.setContentsMargins(10, 10, 10, 10)
         self.horizontal_layout.setSpacing(10)
@@ -71,56 +77,93 @@ class TabCompress(QtWidgets.QWidget):
         self.file_list = []
         self.output_path = Path().home()
         self.file_list_widget = QtWidgets.QListWidget()
-        self.entry_output_path = QtWidgets.QLineEdit()
-        self.entry_output_path.setText(str(self.output_path))
-
+        self.file_list_widget.setMinimumWidth(500)
+        self.label_output_files = QtWidgets.QLabel(str(self.output_path))
+        self.line_edit_suffix = QtWidgets.QLineEdit('_2')
+        self.line_edit_suffix.setMaximumWidth(40)
+        self.line_edit_suffix.textChanged.connect(self.refresh_output_label)
         self.make_layout_compress()
 
     def make_layout_compress(self):
         """Create and arrange the layout for the compression elements.
         """
         vertical_layout_compress = QtWidgets.QVBoxLayout()
-        vertical_layout_compress.setContentsMargins(10, 10, 10, 10)
-        vertical_layout_compress.setSpacing(10)
         self.horizontal_layout.addLayout(vertical_layout_compress)
 
+        label_list_widget = QtWidgets.QLabel('Pdf files to compress:')
+
         push_button_load_files_input = QtWidgets.QPushButton()
-        push_button_load_files_input.setMinimumSize(QSize(100, 30))
-        push_button_load_files_input.setText('Add pdf files')
+        push_button_load_files_input.setToolTip('Add pdf files')
+        push_button_load_files_input.setIcon(QIcon.fromTheme('list-add'))
         push_button_load_files_input.clicked.connect(self.open_file_dialog_input)
         push_button_load_folder_input = QtWidgets.QPushButton()
-        push_button_load_folder_input.setMinimumSize(QSize(100, 30))
-        push_button_load_folder_input.setText('Add all pdf files from a folder')
+        push_button_load_folder_input.setToolTip('Add all pdf files from a folder')
+        push_button_load_folder_input.setIcon(QIcon.fromTheme('folder-add'))
         push_button_load_folder_input.clicked.connect(self.open_folder_dialog_input)
-        label_list_widget = QtWidgets.QLabel('Pdf files to compress:')
         push_button_remove_file = QtWidgets.QPushButton()
-        push_button_remove_file.setText('Remove selected file')
+        push_button_remove_file.setIcon(QIcon.fromTheme('remove'))
+        push_button_remove_file.setToolTip('Remove selected item')
         push_button_remove_file.clicked.connect(self.remove_file)
-        push_button_choose_path_output = QtWidgets.QPushButton()
-        push_button_choose_path_output.setMinimumSize(QSize(100, 30))
-        push_button_choose_path_output.setText('Change output path')
-        push_button_choose_path_output.clicked.connect(self.open_folder_dialog_output)
 
+        push_button_clear_list = QtWidgets.QPushButton()
+        push_button_clear_list.setIcon(QIcon.fromTheme('edit-clear-all'))
+        push_button_clear_list.setToolTip('Clear list')
+        push_button_clear_list.clicked.connect(self.clear_list)
+        label_suffix = QtWidgets.QLabel('Suffix for compressed output files: ')
+        push_button_choose_path_output = QtWidgets.QPushButton()
+        push_button_choose_path_output.setIcon(QIcon.fromTheme('folder-symbolic'))
+        push_button_choose_path_output.setToolTip('Change output path')
+        push_button_choose_path_output.clicked.connect(self.open_folder_dialog_output)
+        push_button_choose_path_output.setSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
+        push_button_choose_path_output.setMinimumHeight(1)
+
+        self.label_output_files.setAlignment(Qt.AlignTop)
+        label_output = QtWidgets.QLabel('Output files:')
+        label_output.setAlignment(Qt.AlignBottom)
         push_button_start_compress = QtWidgets.QPushButton()
         push_button_start_compress.setText('Start compression')
+        push_button_start_compress.setMinimumSize(QSize(110, 20))
         push_button_start_compress.clicked.connect(self.start_compression)
 
-        vertical_layout_compress.addWidget(push_button_load_files_input)
-        vertical_layout_compress.addWidget(push_button_load_folder_input)
         vertical_layout_compress.addWidget(label_list_widget)
-        vertical_layout_compress.addWidget(self.file_list_widget)
-        vertical_layout_compress.addWidget(push_button_remove_file)
-        vertical_layout_compress.addWidget(push_button_choose_path_output)
-        vertical_layout_compress.addWidget(self.entry_output_path)
-        vertical_layout_compress.addWidget(push_button_start_compress)
+        vertical_layout_buttons = QtWidgets.QVBoxLayout()
+
+        scroll_area = QtWidgets.QScrollArea()
+        scroll_area.setWidget(self.label_output_files)
+        scroll_area.setWidgetResizable(True);
+
+        vertical_layout_buttons.addWidget(push_button_load_files_input)
+        vertical_layout_buttons.addWidget(push_button_load_folder_input)
+        vertical_layout_buttons.addWidget(push_button_remove_file)
+        vertical_layout_buttons.addWidget(push_button_clear_list)
+        vertical_layout_buttons.setSpacing(20)
+
+        horizontal_layout_file_list = QtWidgets.QHBoxLayout()
+        horizontal_layout_file_list.addWidget(self.file_list_widget)
+        horizontal_layout_file_list.addLayout(vertical_layout_buttons)
+
+        vertical_layout_compress.addLayout(horizontal_layout_file_list)
+        vertical_layout_compress.addSpacing(10)
+        vertical_layout_compress.addWidget(label_output)
+        horizontal_layout_output_files = QtWidgets.QHBoxLayout()
+
+        horizontal_layout_output_files.addWidget(scroll_area)
+        horizontal_layout_output_files.addWidget(push_button_choose_path_output, alignment=Qt.AlignTop)
+        horizontal_layout_output_files.setSpacing(10)
+
+        vertical_layout_compress.addLayout(horizontal_layout_output_files)
+        horizontal_layout_bottom = QtWidgets.QHBoxLayout()
+        horizontal_layout_bottom.addWidget(label_suffix)
+        horizontal_layout_bottom.addWidget(self.line_edit_suffix)
+        horizontal_layout_bottom.addWidget(push_button_start_compress)
+        vertical_layout_compress.addLayout(horizontal_layout_bottom)
 
     def start_compression(self):
         """Start the compression process by calling self.run_gs(). Opens messagebox when finished.
         """
-        self.output_path = Path(self.entry_output_path.text())
         if self.check_if_output_is_valid_and_different_to_input(self.file_list, self.output_path):
             for file in self.file_list:
-                TabCompress.run_gs(str(file), str(self.output_path / file.name))
+                TabCompress.run_gs(str(file), str(self.output_path / f'{file.stem}{self.line_edit_suffix.text()}.pdf'))
             message_box = QtWidgets.QMessageBox(self)
             message_box.setText('Compression finished!')
             message_box.show()
@@ -140,9 +183,10 @@ class TabCompress(QtWidgets.QWidget):
         if input_file_list:
             if output_path.root and output_path.is_dir():
                 for file in input_file_list:
-                    if file.parent == output_path:
+                    if file.parent == output_path and not self.line_edit_suffix.text():
                         message_box = QtWidgets.QMessageBox(self)
-                        message_box.setText('Output path should be different to the destination of your input files!')
+                        message_box.setText(
+                            'Suffix field is empty! Output path should be different to the path of your input files to avoid losing files!')
                         message_box.show()
                         return False
 
@@ -154,7 +198,7 @@ class TabCompress(QtWidgets.QWidget):
                 return False
         else:
             message_box = QtWidgets.QMessageBox(self)
-            message_box.setText('No input files selected')
+            message_box.setText('No input files selected!')
             message_box.show()
             return False
 
@@ -168,14 +212,7 @@ class TabCompress(QtWidgets.QWidget):
             for file in file_list_temp:
                 self.file_list.append(Path(file))
             PdfTool.refresh_list_widget(self.file_list, self.file_list_widget)
-
-    def open_folder_dialog_output(self):
-        """Opens the folder dialog to choose the destination of the output files. Writes its value to self.output_path.
-        """
-        path = self.folder_dialog_output.getExistingDirectory(self, 'Change output folder!')
-        if path:
-            self.entry_output_path.setText(path)
-            self.output_path = Path(path)
+            self.refresh_output_label()
 
     def open_folder_dialog_input(self):
         """Opens the folder dialog to choose the folder containing the input files.
@@ -186,11 +223,39 @@ class TabCompress(QtWidgets.QWidget):
         if folder.root:
             self.file_list += PdfTool.get_all_files(folder)
             PdfTool.refresh_list_widget(self.file_list, self.file_list_widget)
+            self.refresh_output_label()
+
+    def open_folder_dialog_output(self):
+        """Opens the folder dialog to choose the destination of the output files. Writes its value to self.output_path.
+        """
+        path = self.folder_dialog_output.getExistingDirectory(self, 'Change output folder!')
+        if path:
+            self.output_path = Path(path)
+            self.refresh_output_label()
+
+    def refresh_output_label(self):
+        """Refresh output label to selected output path.
+        """
+        string_output_files = ''
+        if self.file_list:
+            for file in self.file_list:
+                string_output_files += str(self.output_path / f'{file.stem}{self.line_edit_suffix.text()}.pdf\n')
+        else:
+            string_output_files = str(self.output_path)
+        self.label_output_files.setText(string_output_files)
 
     def remove_file(self):
         """Call PdfTool.remove_file to remove selected file from list and widget.
         """
         PdfTool.remove_file(self.file_list, self.file_list_widget)
+        self.refresh_output_label()
+
+    def clear_list(self):
+        """Clear self.file_list and the related list widget.
+        """
+        self.file_list_widget.clear()
+        self.file_list = []
+        self.refresh_output_label()
 
 
 class TabSplit(QtWidgets.QWidget):
@@ -198,21 +263,25 @@ class TabSplit(QtWidgets.QWidget):
     """
     def __init__(self):
         super().__init__()
-
         self.horizontal_layout = QtWidgets.QHBoxLayout(self)
         self.horizontal_layout.setContentsMargins(10, 10, 10, 10)
-        self.horizontal_layout.setSpacing(10)
+        self.horizontal_layout.setSpacing(20)
         self.file_dialog_input = QtWidgets.QFileDialog()
         self.folder_dialog_output = QtWidgets.QFileDialog()
-        self.file = Path()
-        self.label_file = QtWidgets.QLabel('Select a pdf file!')
+        self.file = ""
+        self.label_split_pattern = QtWidgets.QLabel('Pages to extract:')
+        self.label_file = QtWidgets.QLabel()
+        self.label_file.setText('Select a pdf file!')
+        self.label_file.setAlignment(Qt.AlignCenter)
+        self.label_file.setMargin(0)
         self.output_filename_line_edit = QtWidgets.QLineEdit()
         self.output_filename_line_edit.textChanged.connect(self.refresh_output_label)
         self.label_output_path = QtWidgets.QLabel()
         self.output_path = Path().home()
-        self.line_edit_split_pattern = QtWidgets.QLineEdit('1-2,7-9')
+        self.line_edit_split_pattern = QtWidgets.QLineEdit('1-2')
+        self.line_edit_split_pattern.setToolTip('Example: 1-2, 5, 6-9')
         self.compress_radio_button = QtWidgets.QRadioButton()
-        self.compress_radio_button.setText('Compress output pdf file?')
+        self.compress_radio_button.setText('Compress output file')
         self.compress_radio_button.setChecked(True)
         self.make_layout_split()
 
@@ -220,30 +289,47 @@ class TabSplit(QtWidgets.QWidget):
         """Create and arrange the layout for the pdf splitting elements.
         """
         vertical_layout_split = QtWidgets.QVBoxLayout()
-        vertical_layout_split.setContentsMargins(10, 10, 10, 10)
-        vertical_layout_split.setSpacing(10)
         self.horizontal_layout.addLayout(vertical_layout_split)
-        push_button_load_files_input = QtWidgets.QPushButton('Load pdf file')
+        push_button_load_files_input = QtWidgets.QPushButton()
+        push_button_load_files_input.setIcon(QIcon.fromTheme('list-add'))
+        push_button_load_files_input.setToolTip('Load pdf file')
         push_button_load_files_input.clicked.connect(self.open_file_dialog_input)
-        label_split_pattern = QtWidgets.QLabel('Split pattern:')
-        push_button_start_splitting = QtWidgets.QPushButton('Start Splitting')
+
+
+
+
+        push_button_start_splitting = QtWidgets.QPushButton('Start splitting')
+        push_button_start_splitting.setIcon(QIcon.fromTheme('split'))
         push_button_start_splitting.clicked.connect(self.start_splitting)
 
-        push_button_choose_path_output = QtWidgets.QPushButton('Change output path')
+        push_button_choose_path_output = QtWidgets.QPushButton()
+        push_button_choose_path_output.setIcon(QIcon.fromTheme('folder-symbolic'))
         push_button_choose_path_output.clicked.connect(self.open_folder_dialog_output)
 
-        label_filename = QtWidgets.QLabel('Type name of the output file:')
-        vertical_layout_split.addWidget(push_button_load_files_input)
-        vertical_layout_split.addWidget(self.label_file)
-        vertical_layout_split.addWidget(label_split_pattern)
+        label_filename = QtWidgets.QLabel('Name of the output file:')
+
+        horizontal_layout_input_file = QtWidgets.QHBoxLayout()
+        self.label_file.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        horizontal_layout_input_file.addWidget(self.label_file)
+        horizontal_layout_input_file.addWidget(push_button_load_files_input)
+
+        vertical_layout_split.addLayout(horizontal_layout_input_file)
+        self.label_split_pattern.setAlignment(Qt.AlignBottom)
+        vertical_layout_split.addWidget(self.label_split_pattern)
         vertical_layout_split.addWidget(self.line_edit_split_pattern)
+        vertical_layout_split.addSpacing(30)
         vertical_layout_split.addWidget(push_button_choose_path_output)
         horizontal_layout_filename = QtWidgets.QHBoxLayout()
         horizontal_layout_filename.addWidget(label_filename)
         self.output_filename_line_edit.setText('output')
         horizontal_layout_filename.addWidget(self.output_filename_line_edit)
         vertical_layout_split.addLayout(horizontal_layout_filename)
-        vertical_layout_split.addWidget(self.label_output_path)
+
+        horizontal_layout_output_file = QtWidgets.QHBoxLayout()
+        self.label_output_path.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        horizontal_layout_output_file.addWidget(self.label_output_path)
+        horizontal_layout_output_file.addWidget(push_button_choose_path_output)
+        vertical_layout_split.addLayout(horizontal_layout_output_file)
 
         horizontal_layout_bottom = QtWidgets.QHBoxLayout()
         horizontal_layout_bottom.addWidget(self.compress_radio_button)
@@ -258,6 +344,7 @@ class TabSplit(QtWidgets.QWidget):
         self.file = self.file_dialog_input.getOpenFileName(self, 'Select pdf file to split!', '', 'Pdf files (*.pdf)')[0]
         if self.file:
             self.label_file.setText(f'Selected pdf file:   {self.file}')
+        self.label_split_pattern.setText(f'Pages to Extract: (Input file has {PdfTool.get_page_count(self.file)} pages)')
 
     def open_folder_dialog_output(self):
         """Opens the folder dialog to choose the destination of the output files. Writes its value to self.output_path.
@@ -270,7 +357,10 @@ class TabSplit(QtWidgets.QWidget):
     def refresh_output_label(self):
         """Refresh output label to selected output path.
         """
-        self.label_output_path.setText(f'Output File:    {self.output_path}/{self.output_filename_line_edit.text()}.pdf')
+        file_name = self.output_filename_line_edit.text()
+        if file_name[-4:] == '.pdf':
+            file_name = file_name[:-4]
+        self.label_output_path.setText(f'Output File:     {self.output_path}/{file_name}.pdf')
 
     def start_splitting(self):
         """Starts splitting process. Informs when finished or the split pattern has a wrong format.
@@ -278,30 +368,35 @@ class TabSplit(QtWidgets.QWidget):
         list_start_stop = TabSplit.analyze_split_pattern(self.line_edit_split_pattern.text())
         list_indices = []
         output_file = f'{self.output_path}/{self.output_filename_line_edit.text()}.pdf'
-        if list_start_stop:
-            for item in list_start_stop:
-                split_succeeded = self.split_pdf(*item, self.file, output_file)
-                if not split_succeeded:
-                    return
-                list_indices += [n for n in range(int(item[0]), int(item[1]) + 1)]
-            command = ['pdfunite']
-            for index in list_indices:
-                command.append(output_file + str(index))
-            command.append(output_file)
-            subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        if self.file:
+            if list_start_stop:
+                for item in list_start_stop:
+                    split_succeeded = self.split_pdf(*item, self.file, output_file)
+                    if not split_succeeded:
+                        return
+                    list_indices += [n for n in range(int(item[0]), int(item[1]) + 1)]
+                command = ['pdfunite']
+                for index in list_indices:
+                    command.append(output_file + str(index))
+                command.append(output_file)
+                subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
-            for index in list_indices:
-                Path(output_file + str(index)).unlink()
-            if self.compress_radio_button.toggled:
-                TabCompress.run_gs(output_file, output_file + '_')
-                Path(output_file + '_').rename(Path(output_file))
+                for index in list_indices:
+                    Path(output_file + str(index)).unlink()
+                if self.compress_radio_button.toggled:
+                    TabCompress.run_gs(output_file, output_file + '_')
+                    Path(output_file + '_').rename(Path(output_file))
 
-            message_box = QtWidgets.QMessageBox(self)
-            message_box.setText('Splitting finished.')
-            message_box.show()
+                message_box = QtWidgets.QMessageBox(self)
+                message_box.setText('Splitting finished!')
+                message_box.show()
+            else:
+                message_box = QtWidgets.QMessageBox(self)
+                message_box.setText('Wrong split format! Example: 1, 2, 4-6, 8-9')
+                message_box.show()
         else:
             message_box = QtWidgets.QMessageBox(self)
-            message_box.setText('Wrong split format. Example: 1, 2, 4-6, 8-9')
+            message_box.setText('No Input file selected!')
             message_box.show()
 
     @staticmethod
@@ -348,7 +443,6 @@ class TabMerge(QtWidgets.QWidget):
     """
     def __init__(self):
         super().__init__()
-        self.setMinimumWidth(600)
         self.horizontal_layout = QtWidgets.QHBoxLayout(self)
         self.horizontal_layout.setContentsMargins(10, 10, 10, 10)
         self.horizontal_layout.setSpacing(10)
@@ -364,7 +458,7 @@ class TabMerge(QtWidgets.QWidget):
         self.file_list_widget = QtWidgets.QListWidget()
 
         self.compress_radio_button = QtWidgets.QRadioButton()
-        self.compress_radio_button.setText('Compress output pdf file?')
+        self.compress_radio_button.setText('Compress output file')
         self.compress_radio_button.setChecked(True)
         self.make_layout_merge()
 
@@ -372,55 +466,68 @@ class TabMerge(QtWidgets.QWidget):
         """Create and arrange the layout for the pdf merging elements.
         """
         vertical_layout_merge = QtWidgets.QVBoxLayout()
-        vertical_layout_merge.setContentsMargins(10, 10, 10, 10)
-        vertical_layout_merge.setSpacing(10)
         self.horizontal_layout.addLayout(vertical_layout_merge)
+        label_list_widget = QtWidgets.QLabel('Pdf files to merge:')
+        push_button_up = QtWidgets.QPushButton()
+        push_button_up.setIcon(QIcon.fromTheme('go-up'))
+        push_button_up.setToolTip('Move selected item up')
+        push_button_up.clicked.connect(self.move_selected_item_up)
         push_button_load_files_input = QtWidgets.QPushButton()
-        push_button_load_files_input.setMinimumSize(QSize(100, 30))
-        push_button_load_files_input.setText('Add pdf files')
+        push_button_load_files_input.setToolTip('Add pdf files')
+        push_button_load_files_input.setIcon(QIcon.fromTheme('list-add'))
         push_button_load_files_input.clicked.connect(self.open_file_dialog_input)
         push_button_load_folder_input = QtWidgets.QPushButton()
-        push_button_load_folder_input.setMinimumSize(QSize(100, 30))
-        push_button_load_folder_input.setText('Add all pdf files from a folder')
+        push_button_load_folder_input.setToolTip('Add all pdf files from a folder')
+        push_button_load_folder_input.setIcon(QIcon.fromTheme('folder-add'))
         push_button_load_folder_input.clicked.connect(self.open_folder_dialog_input)
-        push_button_up = QtWidgets.QPushButton()
-        push_button_up.setIcon(QIcon.fromTheme('arrow-up'))
-        push_button_up.clicked.connect(self.move_selected_item_up)
-        label_list_widget = QtWidgets.QLabel('Pdf files to merge:')
-        push_button_down = QtWidgets.QPushButton(self)
-        push_button_down.setIcon(QIcon.fromTheme('arrow-down'))
-        push_button_down.clicked.connect(self.move_selected_item_down)
-        push_button_remove_file = QtWidgets.QPushButton(self)
-        push_button_remove_file.setIcon(QIcon.fromTheme('remove'))
+
+        push_button_remove_file = QtWidgets.QPushButton()
+        push_button_remove_file.setIcon(QIcon.fromTheme('list-remove'))
+        push_button_remove_file.setToolTip('Remove selected item')
         push_button_remove_file.clicked.connect(self.remove_file)
-        push_button_choose_path_output = QtWidgets.QPushButton('Change output path')
+        push_button_clear_list = QtWidgets.QPushButton()
+        push_button_clear_list.setIcon(QIcon.fromTheme('edit-clear-all'))
+        push_button_clear_list.setToolTip('Clear list')
+        push_button_clear_list.clicked.connect(self.clear_list)
+        push_button_down = QtWidgets.QPushButton()
+        push_button_down.setIcon(QIcon.fromTheme('go-down'))
+        push_button_down.setToolTip('Move selected item down')
+        push_button_down.clicked.connect(self.move_selected_item_down)
+        label_filename = QtWidgets.QLabel('Name of the output file:')
+        push_button_choose_path_output = QtWidgets.QPushButton()
+        push_button_choose_path_output.setIcon(QIcon.fromTheme('folder-symbolic'))
         push_button_choose_path_output.clicked.connect(self.open_folder_dialog_output)
-        label_filename = QtWidgets.QLabel('Type name of the output file:')
 
         push_button_start_merge = QtWidgets.QPushButton()
-        push_button_start_merge.setText('Merge selected pdf files to one single file')
+        push_button_start_merge.setText('Start merging')
+        push_button_start_merge.setIcon(QIcon.fromTheme('merge'))
         push_button_start_merge.clicked.connect(self.start_merge)
 
-        vertical_layout_merge.addWidget(push_button_load_files_input)
-        vertical_layout_merge.addWidget(push_button_load_folder_input)
         vertical_layout_merge.addWidget(label_list_widget)
 
-        horizontal_layout_file_list = QtWidgets.QHBoxLayout()
         vertical_layout_buttons = QtWidgets.QVBoxLayout()
         vertical_layout_buttons.addWidget(push_button_up)
+        vertical_layout_buttons.addWidget(push_button_load_files_input)
+        vertical_layout_buttons.addWidget(push_button_load_folder_input)
         vertical_layout_buttons.addWidget(push_button_remove_file)
+        vertical_layout_buttons.addWidget(push_button_clear_list)
         vertical_layout_buttons.addWidget(push_button_down)
 
+        horizontal_layout_file_list = QtWidgets.QHBoxLayout()
         horizontal_layout_file_list.addWidget(self.file_list_widget)
         horizontal_layout_file_list.addLayout(vertical_layout_buttons)
         vertical_layout_merge.addLayout(horizontal_layout_file_list)
-        vertical_layout_merge.addWidget(push_button_choose_path_output)
         horizontal_layout_filename = QtWidgets.QHBoxLayout()
         horizontal_layout_filename.addWidget(label_filename)
         self.output_filename_line_edit.setText('output')
         horizontal_layout_filename.addWidget(self.output_filename_line_edit)
         vertical_layout_merge.addLayout(horizontal_layout_filename)
-        vertical_layout_merge.addWidget(self.label_output_path)
+
+        horizontal_layout_output_file = QtWidgets.QHBoxLayout()
+        self.label_output_path.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        horizontal_layout_output_file.addWidget(self.label_output_path)
+        horizontal_layout_output_file.addWidget(push_button_choose_path_output)
+        vertical_layout_merge.addLayout(horizontal_layout_output_file)
 
         horizontal_layout_bottom = QtWidgets.QHBoxLayout()
         horizontal_layout_bottom.addWidget(self.compress_radio_button)
@@ -432,7 +539,7 @@ class TabMerge(QtWidgets.QWidget):
         """
         file_name = self.output_filename_line_edit.text()
         if file_name[-4:] == '.pdf':
-            output_file = file_name[:-4]
+            file_name = file_name[:-4]
         self.label_output_path.setText(f'Output File:     {self.output_path}/{file_name}.pdf')
 
     def move_selected_item_up(self):
@@ -489,6 +596,12 @@ class TabMerge(QtWidgets.QWidget):
         """
         PdfTool.remove_file(self.file_list, self.file_list_widget)
 
+    def clear_list(self):
+        """Clear self.file_list and the related list widget.
+        """
+        self.file_list_widget.clear()
+        self.file_list = []
+
     def start_merge(self):
         """Start merging process with the tool pdfunite. Informs when finished or no input or output file is given.
         """
@@ -504,13 +617,13 @@ class TabMerge(QtWidgets.QWidget):
                 if self.compress_radio_button.toggled:
                     TabCompress.run_gs(output_file + '.pdf', output_file + '_.pdf')
                     Path(output_file + '_.pdf').rename(Path(output_file + '.pdf'))
-                message_box.setText('Emerging finished')
+                message_box.setText('Emerging finished!')
                 message_box.show()
             else:
                 message_box.setText('No pdf files selected!')
                 message_box.show()
         else:
-            message_box.setText('Choose a file name')
+            message_box.setText('Choose a file name!')
             message_box.show()
 
 def main():
