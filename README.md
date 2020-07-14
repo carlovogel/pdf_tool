@@ -3,9 +3,9 @@ Tool with QT5-GUI to compress, split and merge pdf files.
 
 ## Installation:
 
-Used packages : 
-python-pyqt5
-poppler
+Used packages:   
+python-pyqt5  
+poppler  
 ghostscript
 
 
